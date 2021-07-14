@@ -15,6 +15,7 @@ contract dBank {
 
   //add events
   event Deposit(address indexed user, uint etherAmount, uint timeStart);
+  event Withdraw(address indexed user, uint etherAmount, uint depositTime, uint interest);
 
   //pass as constructor argument deployed Token contract
   constructor(Token _token) public {
@@ -43,24 +44,35 @@ contract dBank {
 
   function withdraw() public {
     //check if msg.sender deposit status is true
+    require(isDeposited[msg.sender] == true, 'Error, no previous deposit');
+
     //assign msg.sender ether deposit balance to variable for event
+    uint userBalance = etherBalanceOf[msg.sender];
 
     //check user's hodl time
     uint depositTime = block.timestamp - depositStart[msg.sender];
 
     //calc interest per second
-    //seconds in a year = 60 * 60 * 24 * 365.25 = 31557600
-    uint interPerSecond
+    //seconds in a year = 60 * 60 * 24 * 365.25 = 315507600
+    //10% APY per second for 0.01 ETH(min deposit) = 0.01*1e18*0.1/31557600 = 31688088
+    uint interestPerSecond = 31688088 * (etherBalanceOf[msg.sender] / 1e16);
+    
     //calc accrued interest
+    uint interest = interestPerSecond * depositTime;
 
     //send eth to user
-    msg.sender.transfer(etherBalanceOf[msg.sender]);
+    msg.sender.transfer(userBalance);
+    
     //send interest in tokens to user
+    token.mint(msg.sender, interest);
 
     //reset depositer data
+    depositStart[msg.sender] = 0;
     etherBalanceOf[msg.sender] = 0;
+    isDeposited[msg.sender] = false;
 
     //emit event
+    emit Withdraw(msg.sender, userBalance, depositTime, interest);
   }
 
   function borrow() payable public {
